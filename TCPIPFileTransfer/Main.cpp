@@ -91,7 +91,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ws.lpszClassName = WinClass;
 	RegisterClassW(&ws);
 
-	MainWindow = CreateWindowExW(0, WinClass, L"TCP/IP File Transfer", WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, CW_USEDEFAULT, CW_USEDEFAULT, 460, 480, NULL, NULL, hInstance, NULL);
+	MainWindow = CreateWindowExW(WS_EX_ACCEPTFILES, WinClass, L"TCP/IP File Transfer", WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, CW_USEDEFAULT, CW_USEDEFAULT, 460, 480, NULL, NULL, hInstance, NULL);
 	IPEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"edit", L"", WS_CHILD | WS_VISIBLE | ES_LEFT, 50, 10, 150, 20, MainWindow, NULL, hInstance, NULL);
 	PortEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"edit", L"", WS_CHILD | WS_VISIBLE | ES_LEFT, 50, 40, 150, 20, MainWindow, NULL, hInstance, NULL);
 	StatusStatic = CreateWindowExW(WS_EX_TRANSPARENT, L"static", L"Not connected", WS_CHILD | WS_VISIBLE | ES_LEFT, 10, 70, 420, 20, MainWindow, NULL, hInstance, NULL);
@@ -124,7 +124,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_CLOSE:
 		WSACleanup();
 		ExitProcess(0);
-		break;
+	break;
 	case WM_PAINT:
 	{
 		PAINTSTRUCT ps;
@@ -135,6 +135,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		TextOutW(hdc, 10, 100, L"File name/path", 14);
 
 		EndPaint(MainWindow, &ps);
+	}
+	break;
+	case WM_DROPFILES:
+	{
+		DWORD NameSize = DragQueryFileW((HDROP)wParam, 0, NULL, 0);
+		LPWSTR DroppedFileName = (LPWSTR)malloc((NameSize + 1) * sizeof(WCHAR));
+		DragQueryFileW((HDROP)wParam, 0, (LPWSTR)DroppedFileName, NameSize + 1);
+		SetWindowTextW(FileNameEdit, DroppedFileName);
+		free(DroppedFileName);
 	}
 	break;
 	case WM_COMMAND:
