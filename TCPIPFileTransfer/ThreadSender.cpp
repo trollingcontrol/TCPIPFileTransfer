@@ -4,7 +4,7 @@ DWORD WINAPI ThreadSender(LPVOID SocketPtr)
 {
 	SOCKET Socket = *(SOCKET*)SocketPtr;
 
-	char StrBuf[256];
+	WCHAR StrBuf[256];
 
 	while (TRUE)
 	{
@@ -21,12 +21,12 @@ DWORD WINAPI ThreadSender(LPVOID SocketPtr)
 		{
 			FileTransferringMode = SENDER_MODE;
 
-			AddLogText("File transfer started\r\n");
+			AddLogText(L"File transfer started\r\n");
 
 			int NoPathNameLength;
 
-			char* NameStartPtr = strrchr(FileToSendName, '\\');
-			if (!NameStartPtr) NameStartPtr = strrchr(FileToSendName, '/');
+			wchar_t* NameStartPtr = wcsrchr(FileToSendName, L'\\');
+			if (!NameStartPtr) NameStartPtr = wcsrchr(FileToSendName, L'/');
 			
 			if (!NameStartPtr)
 			{
@@ -41,17 +41,17 @@ DWORD WINAPI ThreadSender(LPVOID SocketPtr)
 
 			FileToSendNoPathName = NameStartPtr;
 
-			DWORD* BufferToSend = (DWORD*)malloc(4 + 4 + NoPathNameLength + 1);
+			DWORD* BufferToSend = (DWORD*)malloc(sizeof(DWORD) * 2 + (NoPathNameLength + 1) * sizeof(WCHAR));
 
 			BufferToSend[0] = CMD_RECEIVER_FILENAME;
 			BufferToSend[1] = NoPathNameLength;
 
-			sprintf_s(StrBuf, "File \"%s\", sending file name\r\n", NameStartPtr);
+			swprintf_s(StrBuf, 256, L"File \"%s\", sending file name\r\n", NameStartPtr);
 			AddLogText(StrBuf);
 
-			memcpy(BufferToSend + 2, NameStartPtr, NoPathNameLength + 1);
+			memcpy(BufferToSend + 2, NameStartPtr, (NoPathNameLength + 1) * sizeof(WCHAR));
 
-			send(Socket, (const char*)BufferToSend, 4 + 4 + NoPathNameLength + 1, 0);
+			send(Socket, (const char*)BufferToSend, sizeof(DWORD) * 2 + (NoPathNameLength + 1) * sizeof(WCHAR), 0);
 
 			free(BufferToSend);
 		}

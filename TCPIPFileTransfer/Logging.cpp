@@ -2,12 +2,12 @@
 
 #define LOGGING_BUFFER_SIZE 32768
 
-char* LoggingBufferStart;
-char* LoggingBufferEnd;
+LPWSTR LoggingBufferStart;
+LPWSTR LoggingBufferEnd;
 
-void AddLogText(LPCSTR Text)
+void AddLogText(LPCWSTR Text)
 {
-	int Len = strlen(Text) + 1;
+	int Len = wcslen(Text) + 1;
 
 	if (Len > LOGGING_BUFFER_SIZE - (LoggingBufferEnd - LoggingBufferStart))
 	{
@@ -15,14 +15,14 @@ void AddLogText(LPCSTR Text)
 		LoggingBufferEnd -= 8192;
 	}
 
-	memcpy(LoggingBufferEnd, Text, Len);
+	memcpy(LoggingBufferEnd, Text, Len * sizeof(WCHAR));
 	LoggingBufferEnd += Len - 1;
 
-	SetWindowTextA(LogEdit, LoggingBufferStart);
+	SetWindowTextW(LogEdit, LoggingBufferStart);
 }
 
 void InitLoggingSystem()
 {
-	LoggingBufferStart = (char*)malloc(LOGGING_BUFFER_SIZE);
+	LoggingBufferStart = (LPWSTR)malloc(LOGGING_BUFFER_SIZE * sizeof(WCHAR));
 	LoggingBufferEnd = LoggingBufferStart;
 }

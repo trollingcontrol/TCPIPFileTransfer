@@ -8,8 +8,8 @@ extern HANDLE SocketBusyMutex;
 extern HANDLE ThreadSenderSemaphore;
 extern DWORD ThreadsState;
 
-extern char* FileToSendName;
-extern char* FileToSendNoPathName;
+extern LPWSTR FileToSendName;
+extern LPWSTR FileToSendNoPathName;
 extern DWORD FileToSendNameLen;
 extern HANDLE FileToSend;
 extern DWORD FileTransferringMode;

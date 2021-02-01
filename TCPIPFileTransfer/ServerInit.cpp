@@ -5,14 +5,14 @@
 // Initalization as server & Waiting for connection
 // After disconnecting waits for new connection
 
-const char* ListeningPort = "80";
+LPCWSTR ListeningPort = L"80";
 
 void DisconnectServer(SOCKET ListenSocket)
 {
 	shutdown(ListenSocket, SD_BOTH);
 	closesocket(ListenSocket);
-	SetWindowTextA(StatusStatic, "Not connected");
-	AddLogText("Connection closed\r\n");
+	SetWindowTextW(StatusStatic, L"Not connected");
+	AddLogText(L"Connection closed\r\n");
 }
 
 DWORD WINAPI InitalizeServer(LPVOID P)
@@ -22,7 +22,7 @@ DWORD WINAPI InitalizeServer(LPVOID P)
 	SOCKET ListenSocket = INVALID_SOCKET;
 	SOCKET ClientSocket = INVALID_SOCKET;
 
-	addrinfo* result, * ptr = NULL, hints;
+	ADDRINFOW* result, * ptr = NULL, hints;
 
 	ZeroMemory(&hints, sizeof(hints));
 	hints.ai_family = AF_INET;
@@ -30,57 +30,57 @@ DWORD WINAPI InitalizeServer(LPVOID P)
 	hints.ai_protocol = IPPROTO_TCP;
 	hints.ai_flags = AI_PASSIVE;
 
-	int Result = getaddrinfo(NULL, ListeningPort, &hints, &result);
+	int Result = GetAddrInfoW(NULL, ListeningPort, &hints, &result);
 	if (Result != 0)
 	{
-		AddLogText("Error: getaddrinfo failed\r\n");
+		AddLogText(L"Error: getaddrinfo failed\r\n");
 		return 3;
 	}
 
 	ListenSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
 	if (ListenSocket == INVALID_SOCKET)
 	{
-		AddLogText("Error: socket failed\r\n");
-		freeaddrinfo(result);
+		AddLogText(L"Error: socket failed\r\n");
+		FreeAddrInfoW(result);
 		return 4;
 	}
 
 	if (bind(ListenSocket, result->ai_addr, (int)result->ai_addrlen) == SOCKET_ERROR)
 	{
-		AddLogText("Error: bind failed\r\n");
-		freeaddrinfo(result);
+		AddLogText(L"Error: bind failed\r\n");
+		FreeAddrInfoW(result);
 		closesocket(ListenSocket);
 		return 5;
 	}
 
-	freeaddrinfo(result);
+	FreeAddrInfoW(result);
 
 	if (listen(ListenSocket, SOMAXCONN) == SOCKET_ERROR)
 	{
-		AddLogText("Error: listen failed\r\n");
+		AddLogText(L"Error: listen failed\r\n");
 		DisconnectServer(ListenSocket);
 		return 6;
 	}
 
 	while (TRUE)
 	{
-		char ConnectingMessage[64];
-		sprintf_s(ConnectingMessage, 64, "Waiting for connection, port: %s", ListeningPort);
-		SetWindowTextA(StatusStatic, ConnectingMessage);
+		WCHAR ConnectingMessage[64];
+		swprintf_s(ConnectingMessage, 64, L"Waiting for connection, port: %s", ListeningPort);
+		SetWindowTextW(StatusStatic, ConnectingMessage);
 
-		AddLogText("Waiting for connection\r\n");
+		AddLogText(L"Waiting for connection\r\n");
 
 		ClientSocket = accept(ListenSocket, NULL, NULL);
 		if (ClientSocket == INVALID_SOCKET)
 		{
-			AddLogText("Error: accept failed\r\n");
+			AddLogText(L"Error: accept failed\r\n");
 			DisconnectServer(ClientSocket);
 			closesocket(ListenSocket);
 			return 7;
 		}
 
-		SetWindowTextA(StatusStatic, "Connected");
-		AddLogText("Connection established\r\n");
+		SetWindowTextW(StatusStatic, L"Connected");
+		AddLogText(L"Connection established\r\n");
 
 		// Handshake
 		DWORD TmpBuf[2];
@@ -105,19 +105,24 @@ DWORD WINAPI InitalizeServer(LPVOID P)
 				}
 				else
 				{
-					AddLogText("Error sending handshake response\r\n");
+					AddLogText(L"Error sending handshake response\r\n");
 					DisconnectServer(ClientSocket);
 				}
 			}
+			else if (TmpBuf[0] == CMD_OLD_HANDSHAKE)
+			{
+				AddLogText(L"Unable to establish connection\r\nVersion of client is older and incompatiable\r\n");
+				DisconnectServer(ClientSocket);
+			}
 			else
 			{
-				AddLogText("Wrong handshake from client\r\n");
+				AddLogText(L"Wrong handshake from client\r\n");
 				DisconnectServer(ClientSocket);
 			}
 		}
 		else
 		{
-			AddLogText("Error receiving handshake\r\n");
+			AddLogText(L"Error receiving handshake\r\n");
 			DisconnectServer(ClientSocket);
 		}
 	}

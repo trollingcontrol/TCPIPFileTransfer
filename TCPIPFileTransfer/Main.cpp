@@ -8,8 +8,6 @@
 #include "ThreadReceiver.h"
 #include "Shared.h"
 
-// TrollingCont. 23.01.2021
-
 #pragma comment(lib, "Ws2_32.lib")
 
 #define CONNECT_BUTTON_ID 100
@@ -49,13 +47,13 @@ HANDLE ThreadSenderSemaphore;
 DWORD ThreadsState = TS_ALIVE;
 
 // Sender mode data
-char* FileToSendName = NULL;
-char* FileToSendNoPathName = NULL;
+LPWSTR FileToSendName = NULL;
+LPWSTR FileToSendNoPathName = NULL;
 DWORD FileToSendNameLen;
 HANDLE FileToSend = NULL;
 DWORD FileToSendSize;
 DWORD FileToSendSectionsCount;
-char* FileToSendDataBuf = NULL;
+char *FileToSendDataBuf = NULL;
 DWORD FileToSendCurrentSection = 0;
 // Sender mode data
 
@@ -68,49 +66,49 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	int Result = WSAStartup(MAKEWORD(2, 2), &wsaData);
 	if (Result != 0)
 	{
-		MessageBoxA(NULL, "WSAStartup failed", "Error", MB_ICONERROR);
+		MessageBoxW(NULL, L"WSAStartup failed", L"Error", MB_ICONERROR);
 		return 2;
 	}
 
 	InitLoggingSystem();
 
-	SocketBusyMutex = CreateMutexA(NULL, FALSE, NULL);
-	ThreadSenderSemaphore = CreateSemaphoreA(NULL, 0, 1, NULL);
+	SocketBusyMutex = CreateMutexW(NULL, FALSE, NULL);
+	ThreadSenderSemaphore = CreateSemaphoreW(NULL, 0, 1, NULL);
 
-	LPCSTR WinClass = "FileTransfer";
+	LPCWSTR WinClass = L"FileTransfer";
 
-	WNDCLASSA ws;
+	WNDCLASSW ws;
 
 	ws.style = CS_HREDRAW;
 	ws.lpfnWndProc = WndProc;
 	ws.cbClsExtra = 0;
 	ws.cbWndExtra = 0;
 	ws.hInstance = hInstance;
-	ws.hIcon = LoadIconA(hInstance, MAKEINTRESOURCEA(32512));
-	ws.hCursor = LoadCursorA(NULL, MAKEINTRESOURCEA(32512));
+	ws.hIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(32512));
+	ws.hCursor = LoadCursorW(NULL, MAKEINTRESOURCEW(32512));
 	ws.hbrBackground = CreateSolidBrush(RGB(255, 255, 255));
 	ws.lpszMenuName = NULL;
 	ws.lpszClassName = WinClass;
-	RegisterClassA(&ws);
+	RegisterClassW(&ws);
 
-	MainWindow = CreateWindowExA(0, WinClass, "TCP/IP File Transfer by TrollingCont [VS '19]", WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, CW_USEDEFAULT, CW_USEDEFAULT, 460, 480, NULL, NULL, hInstance, NULL);
-	IPEdit = CreateWindowExA(WS_EX_CLIENTEDGE, "edit", "", WS_CHILD | WS_VISIBLE | ES_LEFT, 50, 10, 150, 20, MainWindow, NULL, hInstance, NULL);
-	PortEdit = CreateWindowExA(WS_EX_CLIENTEDGE, "edit", "", WS_CHILD | WS_VISIBLE | ES_LEFT, 50, 40, 150, 20, MainWindow, NULL, hInstance, NULL);
-	StatusStatic = CreateWindowExA(WS_EX_TRANSPARENT, "static", "Not connected", WS_CHILD | WS_VISIBLE | ES_LEFT, 10, 70, 420, 20, MainWindow, NULL, hInstance, NULL);
-	ConnectButton = CreateWindowExA(0, "button", "Connect", WS_CHILD | WS_VISIBLE | ES_LEFT, 230, 10, 200, 20, MainWindow, (HMENU)CONNECT_BUTTON_ID, hInstance, NULL);
-	SwitchToServerModeButton = CreateWindowExA(0, "button", "Switch to server mode", WS_CHILD | WS_VISIBLE | ES_LEFT, 230, 40, 200, 20, MainWindow, (HMENU)SWITCH_TO_SERVER_MODE_BUTTON_ID, hInstance, NULL);
-	FileNameEdit = CreateWindowExA(WS_EX_CLIENTEDGE, "edit", "", WS_CHILD | WS_VISIBLE | ES_LEFT | ES_AUTOHSCROLL, 10, 120, 420, 20, MainWindow, NULL, hInstance, NULL);
+	MainWindow = CreateWindowExW(0, WinClass, L"TCP/IP File Transfer", WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, CW_USEDEFAULT, CW_USEDEFAULT, 460, 480, NULL, NULL, hInstance, NULL);
+	IPEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"edit", L"", WS_CHILD | WS_VISIBLE | ES_LEFT, 50, 10, 150, 20, MainWindow, NULL, hInstance, NULL);
+	PortEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"edit", L"", WS_CHILD | WS_VISIBLE | ES_LEFT, 50, 40, 150, 20, MainWindow, NULL, hInstance, NULL);
+	StatusStatic = CreateWindowExW(WS_EX_TRANSPARENT, L"static", L"Not connected", WS_CHILD | WS_VISIBLE | ES_LEFT, 10, 70, 420, 20, MainWindow, NULL, hInstance, NULL);
+	ConnectButton = CreateWindowExW(0, L"button", L"Connect", WS_CHILD | WS_VISIBLE | ES_LEFT, 230, 10, 200, 20, MainWindow, (HMENU)CONNECT_BUTTON_ID, hInstance, NULL);
+	SwitchToServerModeButton = CreateWindowExW(0, L"button", L"Switch to server mode", WS_CHILD | WS_VISIBLE | ES_LEFT, 230, 40, 200, 20, MainWindow, (HMENU)SWITCH_TO_SERVER_MODE_BUTTON_ID, hInstance, NULL);
+	FileNameEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"edit", L"", WS_CHILD | WS_VISIBLE | ES_LEFT | ES_AUTOHSCROLL, 10, 120, 420, 20, MainWindow, NULL, hInstance, NULL);
 
-	LogEdit = CreateWindowExA(WS_EX_TRANSPARENT, "edit", "", WS_CHILD | WS_VISIBLE | ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL | WS_VSCROLL, 10, 180, 420, 250, MainWindow, NULL, hInstance, NULL);
+	LogEdit = CreateWindowExW(WS_EX_TRANSPARENT, L"edit", L"", WS_CHILD | WS_VISIBLE | ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL | WS_VSCROLL, 10, 180, 420, 250, MainWindow, NULL, hInstance, NULL);
 
-	SendFileButton = CreateWindowExA(0, "button", "Send file", WS_CHILD | WS_VISIBLE | ES_LEFT, 10, 150, 200, 20, MainWindow, (HMENU)SEND_FILE_BUTTON_ID, hInstance, NULL);
+	SendFileButton = CreateWindowExW(0, L"button", L"Send file", WS_CHILD | WS_VISIBLE | ES_LEFT, 10, 150, 200, 20, MainWindow, (HMENU)SEND_FILE_BUTTON_ID, hInstance, NULL);
 
 	ShowWindow(MainWindow, SW_SHOW);
 	MSG msg;
-	while (GetMessageA(&msg, MainWindow, 0, 0))
+	while (GetMessageW(&msg, MainWindow, 0, 0))
 	{
 		TranslateMessage(&msg);
-		DispatchMessageA(&msg);
+		DispatchMessageW(&msg);
 	}
 
 	return (int)msg.wParam;
@@ -118,7 +116,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	char StrBuf[256];
+	WCHAR StrBuf[256];
 
 	switch (message)
 	{
@@ -132,9 +130,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		PAINTSTRUCT ps;
 		HDC hdc = BeginPaint(MainWindow, &ps);
 
-		TextOutA(hdc, 10, 10, "IP", 2);
-		TextOutA(hdc, 10, 40, "Port", 4);
-		TextOutA(hdc, 10, 100, "File name/path", 14);
+		TextOutW(hdc, 10, 10, L"IP", 2);
+		TextOutW(hdc, 10, 40, L"Port", 4);
+		TextOutW(hdc, 10, 100, L"File name/path", 14);
 
 		EndPaint(MainWindow, &ps);
 	}
@@ -145,13 +143,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		{
 			if (ProgramMode == SERVER_MODE)
 			{
-				MessageBoxA(MainWindow, "You're already in server mode", "Warning", MB_ICONWARNING);
+				MessageBoxW(MainWindow, L"You're already in server mode", L"Warning", MB_ICONWARNING);
 				return 0;
 			}
 
 			if (ProgramMode == CLIENT_MODE)
 			{
-				MessageBoxA(MainWindow, "You're in server mode.\r\nRestart program to switch to server mode.", "Warning", MB_ICONWARNING);
+				MessageBoxW(MainWindow, L"You're in server mode.\r\nRestart program to switch to server mode.", L"Warning", MB_ICONWARNING);
 				return 0;
 			}
 
@@ -162,35 +160,35 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		{
 			if (ProgramMode == SERVER_MODE)
 			{
-				MessageBoxA(MainWindow, "You're in server mode.\r\nTo connect to another server, restart program.", "Warning", MB_ICONWARNING);
+				MessageBoxW(MainWindow, L"You're in server mode.\r\nTo connect to another server, restart program.", L"Warning", MB_ICONWARNING);
 				return 0;
 			}
 
 			if (ProgramMode == CLIENT_MODE)
 			{
-				MessageBoxA(MainWindow, "You're already in client mode", "Warning", MB_ICONWARNING);
+				MessageBoxW(MainWindow, L"You're already in client mode", L"Warning", MB_ICONWARNING);
 				return 0;
 			}
 
 			ThreadsState = TS_ALIVE;
-			DWORD IPLen = GetWindowTextLengthA(IPEdit);
+			DWORD IPLen = GetWindowTextLengthW(IPEdit);
 			if (IPLen == 0)
 			{
-				MessageBoxA(MainWindow, "Enter IP to connect", "Warning", MB_ICONWARNING);
+				MessageBoxW(MainWindow, L"Enter IP to connect", L"Warning", MB_ICONWARNING);
 				return 0;
 			}
-			DWORD PortLen = GetWindowTextLengthA(PortEdit);
+			DWORD PortLen = GetWindowTextLengthW(PortEdit);
 			if (PortLen == 0)
 			{
-				MessageBoxA(MainWindow, "Enter port to connect", "Warning", MB_ICONWARNING);
+				MessageBoxW(MainWindow, L"Enter port to connect", L"Warning", MB_ICONWARNING);
 				return 0;
 			}
 
-			char* PortText = (char*)malloc(PortLen + 1);
-			char* IPText = (char*)malloc(IPLen + 1);
+			LPWSTR PortText = (LPWSTR)malloc((PortLen + 1) * sizeof(WCHAR));
+			LPWSTR IPText = (LPWSTR)malloc((IPLen + 1) * sizeof(WCHAR));
 
-			GetWindowTextA(IPEdit, IPText, IPLen + 1);
-			GetWindowTextA(PortEdit, PortText, PortLen + 1);
+			GetWindowTextW(IPEdit, IPText, IPLen + 1);
+			GetWindowTextW(PortEdit, PortText, PortLen + 1);
 
 			ConnectParams = (CONNECTIONPARAMS*)malloc(sizeof(CONNECTIONPARAMS));
 			ConnectParams->IPText = IPText;
@@ -203,33 +201,33 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		{
 			if (ProgramMode == IDLE_MODE)
 			{
-				MessageBoxA(MainWindow, "You have to be connected to server or you be a server with connected client", "Warning", MB_ICONWARNING);
+				MessageBoxW(MainWindow, L"You have to be connected to server or you be a server with connected client", L"Warning", MB_ICONWARNING);
 				return 0;
 			}
 
 			if (FileTransferringMode != IDLE_MODE)
 			{
-				MessageBoxA(MainWindow, "File is being sent at the moment.\r\nWait until this operation ends.", "Warning", MB_ICONWARNING);
+				MessageBoxW(MainWindow, L"File is being sent at the moment.\r\nWait until this operation ends.", L"Warning", MB_ICONWARNING);
 				return 0;
 			}
 
-			FileToSendNameLen = GetWindowTextLengthA(FileNameEdit);
+			FileToSendNameLen = GetWindowTextLengthW(FileNameEdit);
 
 			if (FileToSendNameLen == 0)
 			{
-				MessageBoxA(MainWindow, "Enter file name", "Warning", MB_ICONWARNING);
+				MessageBoxW(MainWindow, L"Enter file name", L"Warning", MB_ICONWARNING);
 				return 0;
 			}
 
-			FileToSendName = (char*)malloc(FileToSendNameLen + 1);
-			GetWindowTextA(FileNameEdit, FileToSendName, FileToSendNameLen + 1);
+			FileToSendName = (LPWSTR)malloc((FileToSendNameLen + 1) * sizeof(WCHAR));
+			GetWindowTextW(FileNameEdit, FileToSendName, FileToSendNameLen + 1);
 
-			FileToSend = CreateFileA(FileToSendName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+			FileToSend = CreateFileW(FileToSendName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
 
 			if (FileToSend == INVALID_HANDLE_VALUE)
 			{
-				sprintf_s(StrBuf, 256, "Can't open file, error %ld", GetLastError());
-				MessageBoxA(MainWindow, StrBuf, "Error", MB_ICONERROR);
+				swprintf_s(StrBuf, 256, L"Can't open file, error %ld", GetLastError());
+				MessageBoxW(MainWindow, StrBuf, L"Error", MB_ICONERROR);
 				free(FileToSendName);
 				return 0;
 			}
@@ -238,7 +236,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 			if (FileToSendSize == 0)
 			{
-				MessageBoxA(MainWindow, "This file can't be transferred as it's empty", "Warning", MB_ICONWARNING);
+				MessageBoxW(MainWindow, L"This file can't be transferred as it's empty", L"Warning", MB_ICONWARNING);
 				free(FileToSendName);
 				CloseHandle(FileToSend);
 				return 0;
@@ -249,6 +247,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	}
 	break;
 	default:
-		return DefWindowProcA(hWnd, message, wParam, lParam);
+		return DefWindowProcW(hWnd, message, wParam, lParam);
 	}
 }

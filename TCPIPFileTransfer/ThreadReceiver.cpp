@@ -2,21 +2,21 @@
 
 // Receiver mode data
 DWORD Command = 0;
-char* ReceivedFileName = NULL;
-char* ReceivedFileDataBuf = NULL;
+LPWSTR ReceivedFileName = NULL;
+char *ReceivedFileDataBuf = NULL;
 HANDLE ReceivedFile = NULL;
 DWORD ReceivedFileSectionsCount;
 DWORD ResponseBuffer[2] = { 0 };
 // Receiver mode data
 
-char StrBuf[256];
+WCHAR StrBuf[256];
 
-void WriteFileSize(char *Buffer, DWORD FileSize)
+void WriteFileSize(LPWSTR Buffer, DWORD FileSize)
 {
-	if (FileSize < 1024) sprintf_s(Buffer, 64, "%d B", FileSize);
-	else if (FileSize < 1048576) sprintf_s(Buffer, 64, "%.2lf KB", FileSize / 1024.0);
-	else if (FileSize < 1073741824) sprintf_s(Buffer, 64, "%.2lf MB", FileSize / 1048576.0);
-	else sprintf_s(Buffer, 64, "%.2lf GB", FileSize / 1073741824.0);
+	if (FileSize < 1024) swprintf_s(Buffer, 64, L"%d B", FileSize);
+	else if (FileSize < 1048576) swprintf_s(Buffer, 64, L"%.2lf KB", FileSize / 1024.0);
+	else if (FileSize < 1073741824) swprintf_s(Buffer, 64, L"%.2lf MB", FileSize / 1048576.0);
+	else swprintf_s(Buffer, 64, L"%.2lf GB", FileSize / 1073741824.0);
 
 	AddLogText(Buffer);
 }
@@ -51,7 +51,7 @@ void CleanupReceiverSession()
 	FileTransferringMode = IDLE_MODE;
 	Command = 0;
 
-	AddLogText("File transfer ended\r\n");
+	AddLogText(L"File transfer ended\r\n");
 }
 
 void CleanupSenderSession()
@@ -79,14 +79,14 @@ void CleanupSenderSession()
 	FileToSendCurrentSection = 0;
 	FileTransferringMode = IDLE_MODE;
 
-	AddLogText("File transfer ended\r\n");
+	AddLogText(L"File transfer ended\r\n");
 }
 
 BOOL SendNextFileSection(SOCKET Socket)
 {
-	sprintf_s(StrBuf, 256, "Sending file (%d/%d section)", FileToSendCurrentSection + 1, FileToSendSectionsCount);
+	swprintf_s(StrBuf, 256, L"Sending file (%d/%d section)", FileToSendCurrentSection + 1, FileToSendSectionsCount);
 
-	SetWindowTextA(StatusStatic, StrBuf);
+	SetWindowTextW(StatusStatic, StrBuf);
 
 	DWORD ReadBytes;
 
@@ -121,32 +121,32 @@ DWORD WINAPI ThreadReceiver(LPVOID SocketPtr)
 			{
 				FileTransferringMode = RECEIVER_MODE;
 
-				AddLogText("File transfer started by connected program\r\n");
+				AddLogText(L"File transfer started by connected program\r\n");
 
 				ResponseBuffer[0] = CMD_SENDER_FILENAME;
 
 				DWORD NoPathNameLength;
 
-				recv(Socket, (char*)&NoPathNameLength, 4, 0);
+				recv(Socket, (char*)&NoPathNameLength, sizeof(DWORD), 0);
 
-				ReceivedFileName = (char*)malloc(NoPathNameLength + 1);
-				recv(Socket, ReceivedFileName, NoPathNameLength + 1, 0);
+				ReceivedFileName = (LPWSTR)malloc((NoPathNameLength + 1) * sizeof(WCHAR));
+				recv(Socket, (char *)ReceivedFileName, (NoPathNameLength + 1) * sizeof(WCHAR), 0);
 
-				sprintf_s(StrBuf, 256, "Name of received file: \"%s\"\r\n", ReceivedFileName);
+				swprintf_s(StrBuf, 256, L"Name of received file: \"%s\"\r\n", ReceivedFileName);
 				AddLogText(StrBuf);
 
-				ReceivedFile = CreateFileA(ReceivedFileName, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, 0, NULL);
+				ReceivedFile = CreateFileW(ReceivedFileName, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, 0, NULL);
 
 				if (ReceivedFile != INVALID_HANDLE_VALUE)
 				{
 					ResponseBuffer[1] = TRUE;
 
-					sprintf_s(StrBuf, 256, "File \"%s\" created\r\n", ReceivedFileName);
+					swprintf_s(StrBuf, 256, L"File \"%s\" created\r\n", ReceivedFileName);
 					AddLogText(StrBuf);
 				}
 				else
 				{
-					sprintf_s(StrBuf, 256, "Failed to create file \"%s\", error %ld\r\n", ReceivedFileName, GetLastError());
+					swprintf_s(StrBuf, 256, L"Failed to create file \"%s\", error %ld\r\n", ReceivedFileName, GetLastError());
 					AddLogText(StrBuf);
 
 					ResponseBuffer[1] = FALSE;
@@ -154,7 +154,7 @@ DWORD WINAPI ThreadReceiver(LPVOID SocketPtr)
 					CleanupReceiverSession();
 				}
 
-				send(Socket, (const char*)ResponseBuffer, 8, 0);
+				send(Socket, (const char*)ResponseBuffer, sizeof(DWORD) * 2, 0);
 			}
 
 			// Sender side
@@ -162,26 +162,26 @@ DWORD WINAPI ThreadReceiver(LPVOID SocketPtr)
 			{
 				DWORD ResponseFlag;
 
-				recv(Socket, (char*)&ResponseFlag, 4, 0);
+				recv(Socket, (char*)&ResponseFlag, sizeof(DWORD), 0);
 
 				if (ResponseFlag == TRUE)
 				{
-					AddLogText("File has successfully been created\r\n");
+					AddLogText(L"File has successfully been created\r\n");
 
 					FileToSendSectionsCount = FileToSendSize / FILE_SECTION_SIZE + 1;
 
-					AddLogText("File size ");
+					AddLogText(L"File size ");
 					WriteFileSize(StrBuf, FileToSendSize);
-					sprintf_s(StrBuf, 256, " (%d sections), sending meta data\r\n", FileToSendSectionsCount);
+					swprintf_s(StrBuf, 256, L" (%d sections), sending meta data\r\n", FileToSendSectionsCount);
 					AddLogText(StrBuf);
 
 					DWORD FileMetaToSend[3] = { CMD_RECEIVER_FILEMETA, FileToSendSize, FileToSendSectionsCount };
 
-					send(Socket, (const char*)FileMetaToSend, 12, 0);
+					send(Socket, (const char*)FileMetaToSend, sizeof(FileMetaToSend), 0);
 				}
 				else
 				{
-					AddLogText("An serverside error occured\r\n");
+					AddLogText(L"An serverside error occured\r\n");
 
 					CleanupSenderSession();
 				}
@@ -194,10 +194,10 @@ DWORD WINAPI ThreadReceiver(LPVOID SocketPtr)
 
 				recv(Socket, (char*)FileMetaBuf, 8, 0);
 
-				AddLogText("File meta data got, file size ");
+				AddLogText(L"File meta data got, file size ");
 				WriteFileSize(StrBuf, FileMetaBuf[0]);
 				ReceivedFileSectionsCount = FileMetaBuf[1];
-				sprintf_s(StrBuf, 256, " (%d sections)\r\n", FileMetaBuf[1]);
+				swprintf_s(StrBuf, 256, L" (%d sections)\r\n", FileMetaBuf[1]);
 				AddLogText(StrBuf);
 
 				FileMetaBuf[0] = CMD_SENDER_FILEMETA;
@@ -205,7 +205,7 @@ DWORD WINAPI ThreadReceiver(LPVOID SocketPtr)
 
 				ReceivedFileDataBuf = (char*)malloc(FILE_SECTION_SIZE);
 
-				send(Socket, (const char*)FileMetaBuf, 8, 0);
+				send(Socket, (const char*)FileMetaBuf, sizeof(FileMetaBuf), 0);
 			}
 
 			// Sender side
@@ -222,7 +222,7 @@ DWORD WINAPI ThreadReceiver(LPVOID SocketPtr)
 				}
 				else
 				{
-					AddLogText("An serverside error occured\r\n");
+					AddLogText(L"An serverside error occured\r\n");
 					CleanupSenderSession();
 				}
 			}
@@ -232,11 +232,11 @@ DWORD WINAPI ThreadReceiver(LPVOID SocketPtr)
 			{
 				DWORD CommandsBuf[2];
 
-				recv(Socket, (char*)CommandsBuf, 8, 0);
+				recv(Socket, (char*)CommandsBuf, sizeof(CommandsBuf), 0);
 				recv(Socket, ReceivedFileDataBuf, CommandsBuf[0], 0);
 
-				sprintf_s(StrBuf, 256, "Receiving file (%d/%d sections)", CommandsBuf[1], ReceivedFileSectionsCount);
-				SetWindowTextA(StatusStatic, StrBuf);
+				swprintf_s(StrBuf, 256, L"Receiving file (%d/%d sections)", CommandsBuf[1], ReceivedFileSectionsCount);
+				SetWindowTextW(StatusStatic, StrBuf);
 
 				DWORD Written = 0;
 
@@ -245,18 +245,18 @@ DWORD WINAPI ThreadReceiver(LPVOID SocketPtr)
 				if (WriteResult && Written == CommandsBuf[0]) CommandsBuf[1] = TRUE;
 				else
 				{
-					sprintf_s(StrBuf, 256, "Failed to write section, WriteResult=%d, Written=%d/%d, ErrorCode=%d\r\n", WriteResult, Written, CommandsBuf[0], GetLastError());
+					swprintf_s(StrBuf, 256, L"Failed to write section, WriteResult=%d, Written=%d/%d, ErrorCode=%d\r\n", WriteResult, Written, CommandsBuf[0], GetLastError());
 					AddLogText(StrBuf);
 					CommandsBuf[1] = FALSE;
 
-					SetWindowTextA(StatusStatic, "Connected");
+					SetWindowTextW(StatusStatic, L"Connected");
 
 					CleanupReceiverSession();
 				}
 
 				CommandsBuf[0] = CMD_SENDER_FILEDATA;
 
-				send(Socket, (const char*)CommandsBuf, 8, 0);
+				send(Socket, (const char*)CommandsBuf, sizeof(CommandsBuf), 0);
 			}
 
 			// Sender side
@@ -264,25 +264,25 @@ DWORD WINAPI ThreadReceiver(LPVOID SocketPtr)
 			{
 				DWORD ResponseFlag;
 
-				recv(Socket, (char*)&ResponseFlag, 4, 0);
+				recv(Socket, (char*)&ResponseFlag, sizeof(DWORD), 0);
 
 				if (ResponseFlag == TRUE)
 				{
 					if (FileToSendCurrentSection < FileToSendSectionsCount) SendNextFileSection(Socket);
 					else
 					{
-						AddLogText("All sections has been sent, closing file\r\n");
+						AddLogText(L"All sections has been sent, closing file\r\n");
 
 						DWORD CloseFileCommand = CMD_RECEIVER_CLOSEFILE;
-						send(Socket, (const char*)&CloseFileCommand, 4, 0);
+						send(Socket, (const char*)&CloseFileCommand, sizeof(DWORD), 0);
 					}
 				}
 				else
 				{
-					AddLogText("An serverside error occured\r\n");
+					AddLogText(L"An serverside error occured\r\n");
 
-					sprintf_s(StrBuf, 256, "Connected to %s:%s", ConnectParams->IPText, ConnectParams->PortText);
-					SetWindowTextA(StatusStatic, StrBuf);
+					swprintf_s(StrBuf, 256, L"Connected to %s:%s", ConnectParams->IPText, ConnectParams->PortText);
+					SetWindowTextW(StatusStatic, StrBuf);
 
 					CleanupSenderSession();
 				}
@@ -291,15 +291,17 @@ DWORD WINAPI ThreadReceiver(LPVOID SocketPtr)
 			// Receiver side
 			else if (Command == CMD_RECEIVER_CLOSEFILE)
 			{
-				sprintf_s(StrBuf, 256, "All sections of file \"%s\" has been received, closing file\r\n", ReceivedFileName);
+				swprintf_s(StrBuf, 256, L"All sections of file \"%s\" has been received, closing file\r\n", ReceivedFileName);
 				AddLogText(StrBuf);
 
 				DWORD ResponseBuf[2] = { CMD_SENDER_CLOSEFILE, CloseHandle(ReceivedFile) };
 
-				if (ResponseBuf[1]) AddLogText("File has successfully been received\r\n");
+				ReceivedFile = NULL;
+
+				if (ResponseBuf[1]) AddLogText(L"File has successfully been received\r\n");
 				else
 				{
-					sprintf_s(StrBuf, 256, "Error %d closing file\r\n", GetLastError());
+					swprintf_s(StrBuf, 256, L"Error %d closing file\r\n", GetLastError());
 					AddLogText(StrBuf);
 				}
 
@@ -308,7 +310,7 @@ DWORD WINAPI ThreadReceiver(LPVOID SocketPtr)
 
 				CleanupReceiverSession();
 
-				send(Socket, (const char*)ResponseBuf, 8, 0);
+				send(Socket, (const char*)ResponseBuf, sizeof(ResponseBuf), 0);
 			}
 
 			// Sender side
@@ -318,7 +320,7 @@ DWORD WINAPI ThreadReceiver(LPVOID SocketPtr)
 
 				recv(Socket, (char*)&ResponseFlag, 4, 0);
 
-				sprintf_s(StrBuf, 256, "File \"%s\" has successfully been sent\r\n", FileToSendNoPathName);
+				swprintf_s(StrBuf, 256, L"File \"%s\" has successfully been sent\r\n", FileToSendNoPathName);
 				AddLogText(StrBuf);
 
 				/*SetWindowTextA(StatusStatic, "Connected");*/

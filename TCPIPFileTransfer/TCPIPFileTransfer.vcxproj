@@ -149,10 +149,14 @@
   <ItemGroup>
     <ClInclude Include="ClientInit.h" />
     <ClInclude Include="Logging.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="ServerInit.h" />
     <ClInclude Include="Shared.h" />
     <ClInclude Include="ThreadReceiver.h" />
     <ClInclude Include="ThreadSender.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Version.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -5,5 +5,5 @@
 
 extern HWND LogEdit;
 
-void AddLogText(LPCSTR Text);
+void AddLogText(LPCWSTR Text);
 void InitLoggingSystem();
