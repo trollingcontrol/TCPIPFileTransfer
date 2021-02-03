@@ -17,7 +17,7 @@
 #define CMD_HANDSHAKE 0x40109801  // Client: none; Server: BOOL
 #define CMD_RECEIVER_FILENAME  3  // DWORD FileNameLength; char *FileName, length of array: FileNameLength+1
 #define CMD_SENDER_FILENAME    4  // BOOL Result
-#define CMD_RECEIVER_FILEMETA  5  // DWORD FileSize; DWORD NumberOfSections
+#define CMD_RECEIVER_FILEMETA  5  // LONGLONG FileSize; DWORD NumberOfSections
 #define CMD_SENDER_FILEMETA    6  // BOOL Result
 #define CMD_RECEIVER_FILEDATA  7  // DWORD FileDataSize [0 -> error]; DWORD SectionNumber; char *FileData, length of array: FileDataSize
 #define CMD_SENDER_FILEDATA    8  // BOOL Result

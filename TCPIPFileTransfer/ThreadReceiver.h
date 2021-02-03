@@ -8,7 +8,7 @@ extern DWORD ProgramMode;
 extern HANDLE SocketBusyMutex;
 extern HANDLE ThreadSenderSemaphore;
 extern DWORD ThreadsState;
-extern DWORD FileToSendSize;
+extern LARGE_INTEGER FileToSendSize;
 extern DWORD FileToSendSectionsCount;
 extern HANDLE FileToSend;
 extern LPWSTR FileToSendName;

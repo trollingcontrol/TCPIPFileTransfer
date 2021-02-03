@@ -51,7 +51,7 @@ LPWSTR FileToSendName = NULL;
 LPWSTR FileToSendNoPathName = NULL;
 DWORD FileToSendNameLen;
 HANDLE FileToSend = NULL;
-DWORD FileToSendSize;
+LARGE_INTEGER FileToSendSize;
 DWORD FileToSendSectionsCount;
 char *FileToSendDataBuf = NULL;
 DWORD FileToSendCurrentSection = 0;
@@ -289,9 +289,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				return 0;
 			}
 
-			FileToSendSize = GetFileSize(FileToSend, NULL);
+			GetFileSizeEx(FileToSend, &FileToSendSize);
 
-			if (FileToSendSize == 0)
+			if (FileToSendSize.QuadPart == 0)
 			{
 				MessageBoxW(MainWindow, L"This file can't be transferred as it's empty", L"Warning", MB_ICONWARNING);
 				HeapFree(ProcessHeap, 0, FileToSendName);

@@ -11,9 +11,9 @@ DWORD ResponseBuffer[2] = { 0 };
 
 WCHAR StrBuf[256];
 
-void WriteFileSize(LPWSTR Buffer, DWORD FileSize)
+void WriteFileSize(LPWSTR Buffer, LONGLONG FileSize)
 {
-	if (FileSize < 1024) swprintf_s(Buffer, 64, L"%d B", FileSize);
+	if (FileSize < 1024) swprintf_s(Buffer, 64, L"%llu B", FileSize);
 	else if (FileSize < 1048576) swprintf_s(Buffer, 64, L"%.2lf KB", FileSize / 1024.0);
 	else if (FileSize < 1073741824) swprintf_s(Buffer, 64, L"%.2lf MB", FileSize / 1048576.0);
 	else swprintf_s(Buffer, 64, L"%.2lf GB", FileSize / 1073741824.0);
@@ -84,7 +84,7 @@ void CleanupSenderSession()
 
 BOOL SendNextFileSection(SOCKET Socket)
 {
-	swprintf_s(StrBuf, 256, L"Sending file (%d/%d section)", FileToSendCurrentSection + 1, FileToSendSectionsCount);
+	swprintf_s(StrBuf, 256, L"Sending file (%d/%d sections)", FileToSendCurrentSection + 1, FileToSendSectionsCount);
 	SetWindowTextW(StatusStatic, StrBuf);
 
 	DWORD ReadBytes;
@@ -179,14 +179,16 @@ DWORD WINAPI ThreadReceiver(LPVOID SocketPtr)
 				{
 					AddLogText(L"File has successfully been created\r\n");
 
-					FileToSendSectionsCount = FileToSendSize / FILE_SECTION_SIZE + 1;
+					FileToSendSectionsCount = FileToSendSize.QuadPart / FILE_SECTION_SIZE + 1;
 
 					AddLogText(L"File size ");
-					WriteFileSize(StrBuf, FileToSendSize);
+					WriteFileSize(StrBuf, FileToSendSize.QuadPart);
 					swprintf_s(StrBuf, 256, L" (%d sections), sending meta data\r\n", FileToSendSectionsCount);
 					AddLogText(StrBuf);
 
-					DWORD FileMetaToSend[3] = { CMD_RECEIVER_FILEMETA, FileToSendSize, FileToSendSectionsCount };
+					DWORD FileMetaToSend[4] = { CMD_RECEIVER_FILEMETA };
+					*(LONGLONG *)&FileMetaToSend[1] = FileToSendSize.QuadPart;
+					FileMetaToSend[3] = FileToSendSectionsCount;
 
 					send(Socket, (const char*)FileMetaToSend, sizeof(FileMetaToSend), 0);
 				}
@@ -201,14 +203,14 @@ DWORD WINAPI ThreadReceiver(LPVOID SocketPtr)
 			// Receiver side
 			else if (Command == CMD_RECEIVER_FILEMETA)
 			{
-				DWORD FileMetaBuf[2];
+				DWORD FileMetaBuf[3];
 
-				recv(Socket, (char*)FileMetaBuf, 8, 0);
+				recv(Socket, (char*)FileMetaBuf, sizeof(FileMetaBuf), 0);
 
 				AddLogText(L"File meta data got, file size ");
-				WriteFileSize(StrBuf, FileMetaBuf[0]);
-				ReceivedFileSectionsCount = FileMetaBuf[1];
-				swprintf_s(StrBuf, 256, L" (%d sections)\r\n", FileMetaBuf[1]);
+				WriteFileSize(StrBuf, *(LONGLONG *)FileMetaBuf);
+				ReceivedFileSectionsCount = FileMetaBuf[2];
+				swprintf_s(StrBuf, 256, L" (%d sections)\r\n", FileMetaBuf[2]);
 				AddLogText(StrBuf);
 
 				FileMetaBuf[0] = CMD_SENDER_FILEMETA;
@@ -221,7 +223,7 @@ DWORD WINAPI ThreadReceiver(LPVOID SocketPtr)
 					CleanupReceiverSession();
 				}
 
-				send(Socket, (const char*)FileMetaBuf, sizeof(FileMetaBuf), 0);
+				send(Socket, (const char*)FileMetaBuf, sizeof(DWORD) * 2, 0);
 
 				if (!ReceivedFileDataBuf) ShowWinFuncError(NULL, L"HeapAlloc");
 			}
