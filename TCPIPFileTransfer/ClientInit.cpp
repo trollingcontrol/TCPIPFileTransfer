@@ -26,7 +26,8 @@ DWORD WINAPI InitalizeClientAndConnect(LPVOID ConnectionParams)
 	int Result = GetAddrInfoW(((CONNECTIONPARAMS*)ConnectionParams)->IPText, ((CONNECTIONPARAMS*)ConnectionParams)->PortText, &hints, &result);
 	if (Result)
 	{
-		AddLogText(L"Error: getaddrinfo failed\r\n");
+		swprintf_s(StrBuf, 256, L"getaddrinfo failed, WSA error %ld\r\n", WSAGetLastError());
+		AddLogText(StrBuf);
 		ProgramMode = IDLE_MODE;
 		return 1;
 	}
@@ -36,7 +37,8 @@ DWORD WINAPI InitalizeClientAndConnect(LPVOID ConnectionParams)
 		ConnectSocket = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
 		if (ConnectSocket == INVALID_SOCKET)
 		{
-			AddLogText(L"Error: socket failed\r\n");
+			swprintf_s(StrBuf, 256, L"socket failed, WSA error %ld\r\n", WSAGetLastError());
+			AddLogText(StrBuf);
 			ProgramMode = IDLE_MODE;
 			return 2;
 		}
@@ -55,24 +57,24 @@ DWORD WINAPI InitalizeClientAndConnect(LPVOID ConnectionParams)
 
 	if (ConnectSocket == INVALID_SOCKET)
 	{
-		AddLogText(L"Failed to connect to server\r\n");
+		swprintf_s(StrBuf, 256, L"Failed to connect to server, WSA error %ld\r\n", WSAGetLastError());
+		AddLogText(StrBuf);
 		ProgramMode = IDLE_MODE;
 		return 3;
 	}
 
-	AddLogText(L"Connection established, performing handshake\r\n");
-
 	swprintf_s(StrBuf, 256, L"Connected to %s:%s", ((CONNECTIONPARAMS*)ConnectionParams)->IPText, ((CONNECTIONPARAMS*)ConnectionParams)->PortText);
 	SetWindowTextW(StatusStatic, StrBuf);
 
-	swprintf_s(StrBuf, 256, L"Connected to %s:%s\r\n", ((CONNECTIONPARAMS*)ConnectionParams)->IPText, ((CONNECTIONPARAMS*)ConnectionParams)->PortText);
+	swprintf_s(StrBuf, 256, L"Connection with %s:%s established, performing handshake\r\n", ((CONNECTIONPARAMS*)ConnectionParams)->IPText, ((CONNECTIONPARAMS*)ConnectionParams)->PortText);
 	AddLogText(StrBuf);
 
 	DWORD CommandsBuf[2] = { CMD_HANDSHAKE };
 
 	if (send(ConnectSocket, (const char*)CommandsBuf, 4, 0) == SOCKET_ERROR)
 	{
-		AddLogText(L"Failed to send handshake\r\n");
+		swprintf_s(StrBuf, 256, L"Failed to send handshake (send WSA error %ld)\r\n", WSAGetLastError());
+		AddLogText(StrBuf);
 		DisconnectClient(ConnectSocket);
 		return 4;
 	}
@@ -91,9 +93,9 @@ DWORD WINAPI InitalizeClientAndConnect(LPVOID ConnectionParams)
 			WaitForMultipleObjects(2, DataExchangeThreads, TRUE, INFINITE);
 			DisconnectClient(ConnectSocket);
 
-			free(((CONNECTIONPARAMS*)ConnectionParams)->IPText);
-			free(((CONNECTIONPARAMS*)ConnectionParams)->PortText);
-			free(ConnectionParams);
+			HeapFree(ProcessHeap, 0, ((CONNECTIONPARAMS*)ConnectionParams)->IPText);
+			HeapFree(ProcessHeap, 0, ((CONNECTIONPARAMS*)ConnectionParams)->PortText);
+			HeapFree(ProcessHeap, 0, ConnectionParams);
 		}
 		else
 		{
@@ -103,7 +105,8 @@ DWORD WINAPI InitalizeClientAndConnect(LPVOID ConnectionParams)
 	}
 	else
 	{
-		AddLogText(L"Error: failed to receive answer from server\r\n");
+		swprintf_s(StrBuf, 256, L"Failed to receive answer from server (recv WSA error %ld)\r\n", WSAGetLastError());
+		AddLogText(StrBuf);
 		DisconnectClient(ConnectSocket);
 	}
 

@@ -4,6 +4,7 @@
 #include "Shared.h"
 #include "Logging.h"
 
+extern DWORD ProgramMode;
 extern HANDLE SocketBusyMutex;
 extern HANDLE ThreadSenderSemaphore;
 extern DWORD ThreadsState;
@@ -17,5 +18,6 @@ extern CONNECTIONPARAMS* ConnectParams;
 extern HWND StatusStatic;
 extern DWORD FileToSendCurrentSection;
 extern DWORD FileTransferringMode;
+extern HANDLE ProcessHeap;
 
 DWORD WINAPI ThreadReceiver(LPVOID SocketPtr);

@@ -1,5 +1,8 @@
 #pragma once
 
+#include <Windows.h>
+#include <stdio.h>
+
 #define IDLE_MODE   0
 
 // Program modes
@@ -16,7 +19,7 @@
 #define CMD_SENDER_FILENAME    4  // BOOL Result
 #define CMD_RECEIVER_FILEMETA  5  // DWORD FileSize; DWORD NumberOfSections
 #define CMD_SENDER_FILEMETA    6  // BOOL Result
-#define CMD_RECEIVER_FILEDATA  7  // DWORD FileDataSize; DWORD SectionNumber; char *FileData, length of array: FileDataSize
+#define CMD_RECEIVER_FILEDATA  7  // DWORD FileDataSize [0 -> error]; DWORD SectionNumber; char *FileData, length of array: FileDataSize
 #define CMD_SENDER_FILEDATA    8  // BOOL Result
 #define CMD_RECEIVER_CLOSEFILE 9  // --
 #define CMD_SENDER_CLOSEFILE  10  // BOOL Result
@@ -34,3 +37,6 @@ struct CONNECTIONPARAMS
 	LPWSTR IPText;
 	LPWSTR PortText;
 };
+
+void ShowWinFuncError(HWND Window, LPCWSTR FuncName);
+void FlushNetworkBuffer(SOCKET Socket, int Len);

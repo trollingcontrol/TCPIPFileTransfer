@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 extern HWND LogEdit;
+extern HANDLE ProcessHeap;
 
 void AddLogText(LPCWSTR Text);
-void InitLoggingSystem();
+BOOL InitLoggingSystem();

@@ -59,18 +59,35 @@ DWORD FileToSendCurrentSection = 0;
 
 CONNECTIONPARAMS* ConnectParams;
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+HANDLE ProcessHeap;
+
+int WINAPI wWinMain(
+	_In_ HINSTANCE hInstance,
+	_In_opt_ HINSTANCE hPrevInstance,
+	_In_ LPWSTR lpCmdLine,
+	_In_ int nShowCmd
+)
 {
+	WCHAR StrBuf[256];
+
 	WSADATA wsaData;
 
 	int Result = WSAStartup(MAKEWORD(2, 2), &wsaData);
 	if (Result != 0)
 	{
-		MessageBoxW(NULL, L"WSAStartup failed", L"Error", MB_ICONERROR);
+		swprintf_s(StrBuf, 256, L"Failed to initalize networking (WSAStartup error %ld).\r\nApplication will be closed.", WSAGetLastError());
+		MessageBoxW(NULL, StrBuf, L"Error", MB_ICONERROR);
 		return 2;
 	}
 
-	InitLoggingSystem();
+	ProcessHeap = GetProcessHeap();
+
+	if (InitLoggingSystem() == FALSE)
+	{
+		swprintf_s(StrBuf, 256, L"Failed to initalize logging system, error %ld.\r\nApplication will be closed.", GetLastError());
+		MessageBoxW(NULL, StrBuf, L"Error", MB_ICONERROR);
+		return 3;
+	}
 
 	SocketBusyMutex = CreateMutexW(NULL, FALSE, NULL);
 	ThreadSenderSemaphore = CreateSemaphoreW(NULL, 0, 1, NULL);
@@ -91,7 +108,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ws.lpszClassName = WinClass;
 	RegisterClassW(&ws);
 
-	MainWindow = CreateWindowExW(0, WinClass, L"TCP/IP File Transfer", WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, CW_USEDEFAULT, CW_USEDEFAULT, 460, 480, NULL, NULL, hInstance, NULL);
+	MainWindow = CreateWindowExW(WS_EX_ACCEPTFILES, WinClass, L"TCP/IP File Transfer", WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, CW_USEDEFAULT, CW_USEDEFAULT, 460, 480, NULL, NULL, hInstance, NULL);
 	IPEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"edit", L"", WS_CHILD | WS_VISIBLE | ES_LEFT, 50, 10, 150, 20, MainWindow, NULL, hInstance, NULL);
 	PortEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"edit", L"", WS_CHILD | WS_VISIBLE | ES_LEFT, 50, 40, 150, 20, MainWindow, NULL, hInstance, NULL);
 	StatusStatic = CreateWindowExW(WS_EX_TRANSPARENT, L"static", L"Not connected", WS_CHILD | WS_VISIBLE | ES_LEFT, 10, 70, 420, 20, MainWindow, NULL, hInstance, NULL);
@@ -124,7 +141,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_CLOSE:
 		WSACleanup();
 		ExitProcess(0);
-		break;
+	break;
 	case WM_PAINT:
 	{
 		PAINTSTRUCT ps;
@@ -135,6 +152,22 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		TextOutW(hdc, 10, 100, L"File name/path", 14);
 
 		EndPaint(MainWindow, &ps);
+	}
+	break;
+	case WM_DROPFILES:
+	{
+		DWORD NameSize = DragQueryFileW((HDROP)wParam, 0, NULL, 0);
+
+		LPWSTR DroppedFileName = (LPWSTR)HeapAlloc(ProcessHeap, 0, (NameSize + 1) * sizeof(WCHAR));
+		if (!DroppedFileName)
+		{
+			ShowWinFuncError(MainWindow, L"HeapAlloc");
+			return -1;
+		}
+
+		DragQueryFileW((HDROP)wParam, 0, (LPWSTR)DroppedFileName, NameSize + 1);
+		SetWindowTextW(FileNameEdit, DroppedFileName);
+		HeapFree(ProcessHeap, 0, DroppedFileName);
 	}
 	break;
 	case WM_COMMAND:
@@ -171,6 +204,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			}
 
 			ThreadsState = TS_ALIVE;
+
 			DWORD IPLen = GetWindowTextLengthW(IPEdit);
 			if (IPLen == 0)
 			{
@@ -184,13 +218,30 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				return 0;
 			}
 
-			LPWSTR PortText = (LPWSTR)malloc((PortLen + 1) * sizeof(WCHAR));
-			LPWSTR IPText = (LPWSTR)malloc((IPLen + 1) * sizeof(WCHAR));
+			LPWSTR PortText = (LPWSTR)HeapAlloc(ProcessHeap, 0, (PortLen + 1) * sizeof(WCHAR));
+			if (!PortText)
+			{
+				ShowWinFuncError(MainWindow, L"HeapAlloc");
+				return -1;
+			}
+
+			LPWSTR IPText = (LPWSTR)HeapAlloc(ProcessHeap, 0, (IPLen + 1) * sizeof(WCHAR));
+			if (!IPText)
+			{
+				ShowWinFuncError(MainWindow, L"HeapAlloc");
+				return -1;
+			}
 
 			GetWindowTextW(IPEdit, IPText, IPLen + 1);
 			GetWindowTextW(PortEdit, PortText, PortLen + 1);
 
-			ConnectParams = (CONNECTIONPARAMS*)malloc(sizeof(CONNECTIONPARAMS));
+			ConnectParams = (CONNECTIONPARAMS*)HeapAlloc(ProcessHeap, 0, sizeof(CONNECTIONPARAMS));
+			if (!ConnectParams)
+			{
+				ShowWinFuncError(MainWindow, L"HeapAlloc");
+				return -1;
+			}
+
 			ConnectParams->IPText = IPText;
 			ConnectParams->PortText = PortText;
 
@@ -219,7 +270,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				return 0;
 			}
 
-			FileToSendName = (LPWSTR)malloc((FileToSendNameLen + 1) * sizeof(WCHAR));
+			FileToSendName = (LPWSTR)HeapAlloc(ProcessHeap, 0, (FileToSendNameLen + 1) * sizeof(WCHAR));
+			if (!FileToSendName)
+			{
+				ShowWinFuncError(MainWindow, L"HeapAlloc");
+				return -1;
+			}
+
 			GetWindowTextW(FileNameEdit, FileToSendName, FileToSendNameLen + 1);
 
 			FileToSend = CreateFileW(FileToSendName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
@@ -228,7 +285,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			{
 				swprintf_s(StrBuf, 256, L"Can't open file, error %ld", GetLastError());
 				MessageBoxW(MainWindow, StrBuf, L"Error", MB_ICONERROR);
-				free(FileToSendName);
+				HeapFree(ProcessHeap, 0, FileToSendName);
 				return 0;
 			}
 
@@ -237,7 +294,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			if (FileToSendSize == 0)
 			{
 				MessageBoxW(MainWindow, L"This file can't be transferred as it's empty", L"Warning", MB_ICONWARNING);
-				free(FileToSendName);
+				HeapFree(ProcessHeap, 0, FileToSendName);
 				CloseHandle(FileToSend);
 				return 0;
 			}

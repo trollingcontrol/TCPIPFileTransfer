@@ -17,6 +17,8 @@ void DisconnectServer(SOCKET ListenSocket)
 
 DWORD WINAPI InitalizeServer(LPVOID P)
 {
+	WCHAR StrBuf[256];
+
 	ProgramMode = SERVER_MODE;
 
 	SOCKET ListenSocket = INVALID_SOCKET;
@@ -33,23 +35,29 @@ DWORD WINAPI InitalizeServer(LPVOID P)
 	int Result = GetAddrInfoW(NULL, ListeningPort, &hints, &result);
 	if (Result != 0)
 	{
-		AddLogText(L"Error: getaddrinfo failed\r\n");
+		swprintf_s(StrBuf, 256, L"GetAddrInfoW failed, WSA error %ld\r\n", WSAGetLastError());
+		AddLogText(StrBuf);
+		ProgramMode = IDLE_MODE;
 		return 3;
 	}
 
 	ListenSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
 	if (ListenSocket == INVALID_SOCKET)
 	{
-		AddLogText(L"Error: socket failed\r\n");
+		swprintf_s(StrBuf, 256, L"socket failed, WSA error %ld\r\n", WSAGetLastError());
+		AddLogText(StrBuf);
 		FreeAddrInfoW(result);
+		ProgramMode = IDLE_MODE;
 		return 4;
 	}
 
 	if (bind(ListenSocket, result->ai_addr, (int)result->ai_addrlen) == SOCKET_ERROR)
 	{
-		AddLogText(L"Error: bind failed\r\n");
+		swprintf_s(StrBuf, 256, L"bind failed, WSA error %ld\r\n", WSAGetLastError());
+		AddLogText(StrBuf);
 		FreeAddrInfoW(result);
 		closesocket(ListenSocket);
+		ProgramMode = IDLE_MODE;
 		return 5;
 	}
 
@@ -57,23 +65,24 @@ DWORD WINAPI InitalizeServer(LPVOID P)
 
 	if (listen(ListenSocket, SOMAXCONN) == SOCKET_ERROR)
 	{
-		AddLogText(L"Error: listen failed\r\n");
+		swprintf_s(StrBuf, 256, L"listen failed, WSA error %ld\r\n", WSAGetLastError());
+		AddLogText(StrBuf);
 		DisconnectServer(ListenSocket);
 		return 6;
 	}
 
 	while (TRUE)
 	{
-		WCHAR ConnectingMessage[64];
-		swprintf_s(ConnectingMessage, 64, L"Waiting for connection, port: %s", ListeningPort);
-		SetWindowTextW(StatusStatic, ConnectingMessage);
+		swprintf_s(StrBuf, 256, L"Waiting for connection, port: %s", ListeningPort);
+		SetWindowTextW(StatusStatic, StrBuf);
 
 		AddLogText(L"Waiting for connection\r\n");
 
 		ClientSocket = accept(ListenSocket, NULL, NULL);
 		if (ClientSocket == INVALID_SOCKET)
 		{
-			AddLogText(L"Error: accept failed\r\n");
+			swprintf_s(StrBuf, 256, L"accept failed, WSA error %ld\r\n", WSAGetLastError());
+			AddLogText(StrBuf);
 			DisconnectServer(ClientSocket);
 			closesocket(ListenSocket);
 			return 7;
@@ -105,7 +114,8 @@ DWORD WINAPI InitalizeServer(LPVOID P)
 				}
 				else
 				{
-					AddLogText(L"Error sending handshake response\r\n");
+					swprintf_s(StrBuf, 256, L"Error sending handshake response (send WSA error %ld)\r\n", WSAGetLastError());
+					AddLogText(StrBuf);
 					DisconnectServer(ClientSocket);
 				}
 			}
@@ -122,7 +132,8 @@ DWORD WINAPI InitalizeServer(LPVOID P)
 		}
 		else
 		{
-			AddLogText(L"Error receiving handshake\r\n");
+			swprintf_s(StrBuf, 256, L"Error receiving handshake (recv WSA error %ld)\r\n", WSAGetLastError());
+			AddLogText(StrBuf);
 			DisconnectServer(ClientSocket);
 		}
 	}

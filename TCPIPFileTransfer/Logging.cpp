@@ -21,8 +21,12 @@ void AddLogText(LPCWSTR Text)
 	SetWindowTextW(LogEdit, LoggingBufferStart);
 }
 
-void InitLoggingSystem()
+BOOL InitLoggingSystem()
 {
-	LoggingBufferStart = (LPWSTR)malloc(LOGGING_BUFFER_SIZE * sizeof(WCHAR));
+	LoggingBufferStart = (LPWSTR)HeapAlloc(ProcessHeap, 0, LOGGING_BUFFER_SIZE * sizeof(WCHAR));
+	if (!LoggingBufferStart) return FALSE;
+
 	LoggingBufferEnd = LoggingBufferStart;
+
+	return TRUE;
 }

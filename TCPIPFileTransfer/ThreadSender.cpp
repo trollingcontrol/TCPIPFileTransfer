@@ -41,19 +41,26 @@ DWORD WINAPI ThreadSender(LPVOID SocketPtr)
 
 			FileToSendNoPathName = NameStartPtr;
 
-			DWORD* BufferToSend = (DWORD*)malloc(sizeof(DWORD) * 2 + (NoPathNameLength + 1) * sizeof(WCHAR));
+			DWORD* BufferToSend = (DWORD*)HeapAlloc(ProcessHeap, 0, sizeof(DWORD) * 2 + (NoPathNameLength + 1) * sizeof(WCHAR));
+			if (!BufferToSend)
+			{
+				ShowWinFuncError(NULL, L"HeapAlloc");
+				FileTransferringMode = IDLE_MODE;
+				AddLogText(L"File transfer ended\r\n");
+				continue;
+			}
 
 			BufferToSend[0] = CMD_RECEIVER_FILENAME;
 			BufferToSend[1] = NoPathNameLength;
 
-			swprintf_s(StrBuf, 256, L"File \"%s\", sending file name\r\n", NameStartPtr);
+			swprintf_s(StrBuf, 256, L"File %s, sending file name\r\n", NameStartPtr);
 			AddLogText(StrBuf);
 
 			memcpy(BufferToSend + 2, NameStartPtr, (NoPathNameLength + 1) * sizeof(WCHAR));
 
 			send(Socket, (const char*)BufferToSend, sizeof(DWORD) * 2 + (NoPathNameLength + 1) * sizeof(WCHAR), 0);
 
-			free(BufferToSend);
+			HeapFree(ProcessHeap, 0, BufferToSend);
 		}
 
 		ReleaseMutex(SocketBusyMutex);

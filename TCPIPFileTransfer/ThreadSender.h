@@ -13,5 +13,6 @@ extern LPWSTR FileToSendNoPathName;
 extern DWORD FileToSendNameLen;
 extern HANDLE FileToSend;
 extern DWORD FileTransferringMode;
+extern HANDLE ProcessHeap;
 
 DWORD WINAPI ThreadSender(LPVOID SocketPtr);

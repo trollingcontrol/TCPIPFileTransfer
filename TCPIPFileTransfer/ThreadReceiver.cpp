@@ -32,19 +32,19 @@ void CleanupReceiverSession()
 
 	if (ReceivedFileName)
 	{
-		free(ReceivedFileName);
+		HeapFree(ProcessHeap, 0, ReceivedFileName);
 		ReceivedFileName = NULL;
 	}
 
 	if (ReceivedFileDataBuf)
 	{
-		free(ReceivedFileDataBuf);
+		HeapFree(ProcessHeap, 0, ReceivedFileDataBuf);
 		ReceivedFileDataBuf = NULL;
 	}
 
 	if (FileToSendDataBuf)
 	{
-		free(FileToSendDataBuf);
+		HeapFree(ProcessHeap, 0, FileToSendDataBuf);
 		FileToSendDataBuf = NULL;
 	}
 
@@ -58,13 +58,13 @@ void CleanupSenderSession()
 {
 	if (FileToSendName)
 	{
-		free(FileToSendName);
+		HeapFree(ProcessHeap, 0, FileToSendName);
 		FileToSendName = NULL;
 	}
 
 	if (FileToSendDataBuf)
 	{
-		free(FileToSendDataBuf);
+		HeapFree(ProcessHeap, 0, FileToSendDataBuf);
 		FileToSendDataBuf = NULL;
 	}
 
@@ -85,7 +85,6 @@ void CleanupSenderSession()
 BOOL SendNextFileSection(SOCKET Socket)
 {
 	swprintf_s(StrBuf, 256, L"Sending file (%d/%d section)", FileToSendCurrentSection + 1, FileToSendSectionsCount);
-
 	SetWindowTextW(StatusStatic, StrBuf);
 
 	DWORD ReadBytes;
@@ -108,6 +107,8 @@ DWORD WINAPI ThreadReceiver(LPVOID SocketPtr)
 {
 	SOCKET Socket = *(SOCKET*)SocketPtr;
 
+	AddLogText(L"Handshake performed successfully\r\nReady to transfer files\r\n");
+
 	while (TRUE)
 	{
 		int Result = recv(Socket, (char*)&Command, 4, 0);
@@ -129,10 +130,20 @@ DWORD WINAPI ThreadReceiver(LPVOID SocketPtr)
 
 				recv(Socket, (char*)&NoPathNameLength, sizeof(DWORD), 0);
 
-				ReceivedFileName = (LPWSTR)malloc((NoPathNameLength + 1) * sizeof(WCHAR));
+				ReceivedFileName = (LPWSTR)HeapAlloc(ProcessHeap, 0, (NoPathNameLength + 1) * sizeof(WCHAR));
+				if (!ReceivedFileName)
+				{
+					FlushNetworkBuffer(Socket, (NoPathNameLength + 1) * sizeof(WCHAR));
+					ResponseBuffer[1] = FALSE;
+					send(Socket, (const char*)ResponseBuffer, sizeof(DWORD) * 2, 0);
+					CleanupReceiverSession();
+					ShowWinFuncError(NULL, L"HeapAlloc");
+					continue;
+				}
+
 				recv(Socket, (char *)ReceivedFileName, (NoPathNameLength + 1) * sizeof(WCHAR), 0);
 
-				swprintf_s(StrBuf, 256, L"Name of received file: \"%s\"\r\n", ReceivedFileName);
+				swprintf_s(StrBuf, 256, L"Name of received file: %s\r\n", ReceivedFileName);
 				AddLogText(StrBuf);
 
 				ReceivedFile = CreateFileW(ReceivedFileName, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, 0, NULL);
@@ -141,12 +152,12 @@ DWORD WINAPI ThreadReceiver(LPVOID SocketPtr)
 				{
 					ResponseBuffer[1] = TRUE;
 
-					swprintf_s(StrBuf, 256, L"File \"%s\" created\r\n", ReceivedFileName);
+					swprintf_s(StrBuf, 256, L"File %s created\r\n", ReceivedFileName);
 					AddLogText(StrBuf);
 				}
 				else
 				{
-					swprintf_s(StrBuf, 256, L"Failed to create file \"%s\", error %ld\r\n", ReceivedFileName, GetLastError());
+					swprintf_s(StrBuf, 256, L"Failed to create file %s, error %ld\r\n", ReceivedFileName, GetLastError());
 					AddLogText(StrBuf);
 
 					ResponseBuffer[1] = FALSE;
@@ -181,7 +192,7 @@ DWORD WINAPI ThreadReceiver(LPVOID SocketPtr)
 				}
 				else
 				{
-					AddLogText(L"An serverside error occured\r\n");
+					AddLogText(L"A receiver side error\r\n");
 
 					CleanupSenderSession();
 				}
@@ -201,11 +212,18 @@ DWORD WINAPI ThreadReceiver(LPVOID SocketPtr)
 				AddLogText(StrBuf);
 
 				FileMetaBuf[0] = CMD_SENDER_FILEMETA;
-				FileMetaBuf[1] = TRUE;
 
-				ReceivedFileDataBuf = (char*)malloc(FILE_SECTION_SIZE);
+				ReceivedFileDataBuf = (char*)HeapAlloc(ProcessHeap, 0, FILE_SECTION_SIZE);
+				if (ReceivedFileDataBuf) FileMetaBuf[1] = TRUE;
+				else
+				{
+					FileMetaBuf[1] = FALSE;
+					CleanupReceiverSession();
+				}
 
 				send(Socket, (const char*)FileMetaBuf, sizeof(FileMetaBuf), 0);
+
+				if (!ReceivedFileDataBuf) ShowWinFuncError(NULL, L"HeapAlloc");
 			}
 
 			// Sender side
@@ -217,12 +235,18 @@ DWORD WINAPI ThreadReceiver(LPVOID SocketPtr)
 
 				if (ResponseFlag == TRUE)
 				{
-					FileToSendDataBuf = (char*)malloc(FILE_SECTION_SIZE);
-					SendNextFileSection(Socket);
+					FileToSendDataBuf = (char*)HeapAlloc(ProcessHeap, 0, FILE_SECTION_SIZE);
+					if (!FileToSendDataBuf)
+					{
+						DWORD ErrorBlock[2] = { CMD_RECEIVER_FILEDATA, 0 };
+						send(Socket, (const char*)ErrorBlock, sizeof(ErrorBlock), 0);
+						ShowWinFuncError(NULL, L"HeapAlloc");
+					}
+					else SendNextFileSection(Socket);
 				}
 				else
 				{
-					AddLogText(L"An serverside error occured\r\n");
+					AddLogText(L"A receiver side error\r\n");
 					CleanupSenderSession();
 				}
 			}
@@ -232,7 +256,20 @@ DWORD WINAPI ThreadReceiver(LPVOID SocketPtr)
 			{
 				DWORD CommandsBuf[2];
 
-				recv(Socket, (char*)CommandsBuf, sizeof(CommandsBuf), 0);
+				recv(Socket, (char*)CommandsBuf, sizeof(DWORD), 0);
+
+				if (CommandsBuf[0] == 0)
+				{
+					AddLogText(L"A client error\r\n");
+					CleanupReceiverSession();
+					CommandsBuf[0] = CMD_SENDER_FILEDATA;
+					CommandsBuf[1] = FALSE;
+					send(Socket, (const char*)CommandsBuf, sizeof(CommandsBuf), 0);
+
+					continue;
+				}
+
+				recv(Socket, (char*)&CommandsBuf[1], sizeof(DWORD), 0);
 				recv(Socket, ReceivedFileDataBuf, CommandsBuf[0], 0);
 
 				swprintf_s(StrBuf, 256, L"Receiving file (%d/%d sections)", CommandsBuf[1], ReceivedFileSectionsCount);
@@ -249,7 +286,12 @@ DWORD WINAPI ThreadReceiver(LPVOID SocketPtr)
 					AddLogText(StrBuf);
 					CommandsBuf[1] = FALSE;
 
-					SetWindowTextW(StatusStatic, L"Connected");
+					if (ProgramMode == SERVER_MODE) SetWindowTextW(StatusStatic, L"Connected");
+					else
+					{
+						swprintf_s(StrBuf, 256, L"Connected to %s:%s", ConnectParams->IPText, ConnectParams->PortText);
+						SetWindowTextW(StatusStatic, StrBuf);
+					}
 
 					CleanupReceiverSession();
 				}
@@ -279,10 +321,14 @@ DWORD WINAPI ThreadReceiver(LPVOID SocketPtr)
 				}
 				else
 				{
-					AddLogText(L"An serverside error occured\r\n");
+					AddLogText(L"A receiver side error\r\n");
 
-					swprintf_s(StrBuf, 256, L"Connected to %s:%s", ConnectParams->IPText, ConnectParams->PortText);
-					SetWindowTextW(StatusStatic, StrBuf);
+					if (ProgramMode == SERVER_MODE) SetWindowTextW(StatusStatic, L"Connected");
+					else
+					{
+						swprintf_s(StrBuf, 256, L"Connected to %s:%s", ConnectParams->IPText, ConnectParams->PortText);
+						SetWindowTextW(StatusStatic, StrBuf);
+					}
 
 					CleanupSenderSession();
 				}
@@ -291,7 +337,7 @@ DWORD WINAPI ThreadReceiver(LPVOID SocketPtr)
 			// Receiver side
 			else if (Command == CMD_RECEIVER_CLOSEFILE)
 			{
-				swprintf_s(StrBuf, 256, L"All sections of file \"%s\" has been received, closing file\r\n", ReceivedFileName);
+				swprintf_s(StrBuf, 256, L"All sections of file %s has been received, closing file\r\n", ReceivedFileName);
 				AddLogText(StrBuf);
 
 				DWORD ResponseBuf[2] = { CMD_SENDER_CLOSEFILE, CloseHandle(ReceivedFile) };
@@ -301,12 +347,16 @@ DWORD WINAPI ThreadReceiver(LPVOID SocketPtr)
 				if (ResponseBuf[1]) AddLogText(L"File has successfully been received\r\n");
 				else
 				{
-					swprintf_s(StrBuf, 256, L"Error %d closing file\r\n", GetLastError());
+					swprintf_s(StrBuf, 256, L"Error %ld closing file\r\n", GetLastError());
 					AddLogText(StrBuf);
 				}
 
-				/*sprintf_s(StrBuf, 256, "Connected to %s:%s", ConnectParams->IPText, ConnectParams->PortText);
-				SetWindowTextA(StatusStatic, StrBuf);*/
+				if (ProgramMode == SERVER_MODE) SetWindowTextW(StatusStatic, L"Connected");
+				else
+				{
+					swprintf_s(StrBuf, 256, L"Connected to %s:%s", ConnectParams->IPText, ConnectParams->PortText);
+					SetWindowTextW(StatusStatic, StrBuf);
+				}
 
 				CleanupReceiverSession();
 
@@ -318,12 +368,17 @@ DWORD WINAPI ThreadReceiver(LPVOID SocketPtr)
 			{
 				DWORD ResponseFlag;
 
-				recv(Socket, (char*)&ResponseFlag, 4, 0);
+				recv(Socket, (char*)&ResponseFlag, sizeof(DWORD), 0);
 
-				swprintf_s(StrBuf, 256, L"File \"%s\" has successfully been sent\r\n", FileToSendNoPathName);
+				swprintf_s(StrBuf, 256, L"File %s has successfully been sent\r\n", FileToSendNoPathName);
 				AddLogText(StrBuf);
 
-				/*SetWindowTextA(StatusStatic, "Connected");*/
+				if (ProgramMode == SERVER_MODE) SetWindowTextW(StatusStatic, L"Connected");
+				else
+				{
+					swprintf_s(StrBuf, 256, L"Connected to %s:%s", ConnectParams->IPText, ConnectParams->PortText);
+					SetWindowTextW(StatusStatic, StrBuf);
+				}
 
 				CleanupSenderSession();
 			}
