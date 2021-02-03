@@ -186,8 +186,24 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				return 0;
 			}
 
+			DWORD PortLen = GetWindowTextLengthW(PortEdit);
+			if (PortLen == 0)
+			{
+				MessageBoxW(MainWindow, L"Enter port to listen", L"Warning", MB_ICONWARNING);
+				return 0;
+			}
+
+			LPWSTR PortText = (LPWSTR)HeapAlloc(ProcessHeap, 0, (PortLen + 1) * sizeof(WCHAR));
+			if (!PortText)
+			{
+				ShowWinFuncError(MainWindow, L"HeapAlloc");
+				return -1;
+			}
+
+			GetWindowTextW(PortEdit, PortText, PortLen + 1);
+
 			ThreadsState = TS_ALIVE;
-			CreateThread(NULL, 0, InitalizeServer, NULL, 0, NULL);
+			CreateThread(NULL, 0, InitalizeServer, PortText, 0, NULL);
 		}
 		else if (wParam == CONNECT_BUTTON_ID)
 		{

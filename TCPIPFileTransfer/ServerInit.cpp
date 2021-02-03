@@ -5,8 +5,6 @@
 // Initalization as server & Waiting for connection
 // After disconnecting waits for new connection
 
-LPCWSTR ListeningPort = L"80";
-
 void DisconnectServer(SOCKET ListenSocket)
 {
 	shutdown(ListenSocket, SD_BOTH);
@@ -15,8 +13,10 @@ void DisconnectServer(SOCKET ListenSocket)
 	AddLogText(L"Connection closed\r\n");
 }
 
-DWORD WINAPI InitalizeServer(LPVOID P)
+DWORD WINAPI InitalizeServer(LPVOID ListeningPortPtr)
 {
+	LPCWSTR ListeningPort = (LPCWSTR)ListeningPortPtr;
+
 	WCHAR StrBuf[256];
 
 	ProgramMode = SERVER_MODE;
@@ -111,6 +111,8 @@ DWORD WINAPI InitalizeServer(LPVOID P)
 
 					WaitForMultipleObjects(2, DataExchangeThreads, TRUE, INFINITE);
 					DisconnectServer(ClientSocket);
+
+					HeapFree(ProcessHeap, 0, ListeningPortPtr);
 				}
 				else
 				{
